@@ -1,1 +1,154 @@
 # audio
+<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Аудио в текст</title>
+<style>
+:root{--bg:#f5f5f7;--card:#fff;--tx:#1d1d1f;--mu:#86868b;--ac:#0071e3;--ln:#e8e8ed}
+@media(prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--tx:#f5f5f7;--ln:#2c2c2e}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.55 -apple-system,BlinkMacSystemFont,"Inter","Segoe UI",sans-serif;padding:max(24px,env(safe-area-inset-top)) 16px 48px}
+main{max-width:680px;margin:0 auto}h1{font-size:clamp(28px,6vw,40px);letter-spacing:-.03em;margin:32px 0 8px;text-align:center}
+.sub{color:var(--mu);text-align:center;margin:0 0 28px}
+.card{background:var(--card);border-radius:20px;padding:22px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:16px;animation:in .35s ease}
+@keyframes in{from{opacity:0;transform:translateY(8px)}}
+.drop{border:2px dashed var(--ln);text-align:center;padding:40px 20px;transition:.2s}.drop.over{border-color:var(--ac);background:rgba(0,113,227,.06)}
+.drop svg{width:40px;height:40px;stroke:var(--ac);fill:none;stroke-width:1.6}.hint{color:var(--mu);font-size:14px;margin:8px 0 18px}
+button{font:inherit;border:0;border-radius:12px;padding:11px 18px;cursor:pointer;background:var(--ln);color:var(--tx);transition:.15s}
+button:hover{filter:brightness(.96)}button.p{background:var(--ac);color:#fff;font-weight:600}button:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.name{font-weight:600;word-break:break-all}.mu{color:var(--mu);font-size:14px}
+audio{width:100%;margin-top:12px}.hide{display:none!important}
+.load{text-align:center;padding:36px 20px}.dots{display:flex;gap:6px;justify-content:center;margin-bottom:14px}
+.dots i{width:10px;height:10px;border-radius:50%;background:var(--ac);animation:b 1s infinite}.dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
+@keyframes b{50%{transform:translateY(-10px);opacity:.4}}
+.res{white-space:pre-wrap;word-wrap:break-word}.err{background:#ff3b3010;color:#d70015;border-radius:12px;padding:12px 14px;margin-bottom:16px}
+h3{margin:0 0 8px;font-size:15px;color:var(--mu);font-weight:600}
+</style></head><body><main>
+<h1>Преврати аудио в текст</h1>
+<p class="sub">Загрузи запись — получи готовую расшифровку за несколько секунд.</p>
+<div id="err" class="err hide"></div>
+
+<div id="drop" class="card drop">
+ <svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7 9m5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+ <div class="hint">Перетащи файл сюда · MP3, WAV, M4A, MP4 · до 4 минут</div>
+ <button class="p" onclick="f.click()">Выбрать аудио</button>
+ <input id="f" type="file" accept="audio/*,video/mp4,.mp3,.wav,.m4a,.mp4,.ogg,.flac,.webm" hidden>
+</div>
+
+<div id="file" class="card hide">
+ <div class="name" id="fname"></div><div class="mu" id="fdur"></div>
+ <audio id="player" controls></audio>
+ <div class="row"><button class="p" id="go">Расшифровать</button><button id="re">Другой файл</button></div>
+</div>
+
+<div id="load" class="card load hide"><div class="dots"><i></i><i></i><i></i></div><div id="status">Загружаю…</div></div>
+
+<div id="out" class="card hide">
+ <div class="res" id="text"></div>
+ <div class="row">
+  <button class="p" id="copy">Скопировать текст</button><button id="dl">Скачать TXT</button>
+  <button id="sum">Краткое содержание</button><button id="tsk">Выделить задания</button><button id="clr">Очистить</button>
+ </div>
+</div>
+<div id="ana" class="card hide"><h3 id="atitle"></h3><div class="res" id="atext"></div></div>
+</main>
+<script>
+const $=id=>document.getElementById(id);let file=null,dur=0,text='',url='';
+const show=(el,v)=>$(el).classList.toggle('hide',!v);
+const err=m=>{$('err').textContent=m||'';show('err',!!m)};
+function reset(){file=null;text='';if(url)URL.revokeObjectURL(url);$('f').value='';err();['file','load','out','ana'].forEach(x=>show(x,0));show('drop',1)}
+function pick(fl){err();if(!fl)return;
+ const a=new Audio();url=URL.createObjectURL(fl);a.src=url;a.preload='metadata';
+ a.onloadedmetadata=()=>{dur=a.duration;
+  if(dur>240){err(`Запись длится ${Math.ceil(dur)} с — максимум 4 минуты.`);URL.revokeObjectURL(url);return}
+  file=fl;$('fname').textContent=fl.name;$('fdur').textContent=`Длительность: ${Math.floor(dur/60)}:${String(Math.round(dur%60)).padStart(2,'0')}`;
+  $('player').src=url;show('drop',0);show('file',1)};
+ a.onerror=()=>err('Формат не поддерживается или файл повреждён.')}
+$('f').onchange=e=>pick(e.target.files[0]);
+const d=$('drop');['dragover','dragenter'].forEach(t=>d.addEventListener(t,e=>{e.preventDefault();d.classList.add('over')}));
+['dragleave','drop'].forEach(t=>d.addEventListener(t,e=>{e.preventDefault();d.classList.remove('over')}));
+d.addEventListener('drop',e=>pick(e.dataTransfer.files[0]));
+$('re').onclick=reset;$('clr').onclick=reset;
+$('go').onclick=async()=>{err();show('file',0);show('out',0);show('ana',0);show('load',1);
+ const msgs=['Загружаю запись…','Распознаю речь…','Расставляю знаки препинания…','Делю на абзацы…'];let i=0;$('status').textContent=msgs[0];
+ const t=setInterval(()=>$('status').textContent=msgs[Math.min(++i,3)],5000);
+ try{const fd=new FormData();fd.append('audio',file);
+  const r=await fetch('/api/transcribe',{method:'POST',body:fd});const j=await r.json();
+  if(!r.ok)throw new Error(j.error||'Ошибка');
+  text=j.text;$('text').textContent=text;show('out',1)}
+ catch(e){err(e.message);show('file',1)}finally{clearInterval(t);show('load',0)}};
+$('copy').onclick=async e=>{await navigator.clipboard.writeText(text);e.target.textContent='Скопировано ✓';setTimeout(()=>e.target.textContent='Скопировать текст',1500)};
+$('dl').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'}));a.download=(file?.name||'transcript').replace(/\.[^.]+$/,'')+'.txt';a.click()};
+async function an(mode,title,btn){err();btn.disabled=true;const o=btn.textContent;btn.textContent='Думаю…';
+ try{const r=await fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,mode})});const j=await r.json();
+  if(!r.ok)throw new Error(j.error);$('atitle').textContent=title;$('atext').textContent=j.result;show('ana',1)}
+ catch(e){err(e.message)}finally{btn.disabled=false;btn.textContent=o}}
+$('sum').onclick=e=>an('summary','Краткое содержание',e.target);$('tsk').onclick=e=>an('tasks','Задания и поручения',e.target);
+</script></body></html>
+import 'dotenv/config';
+import express from 'express';
+import multer from 'multer';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import OpenAI, { toFile } from 'openai';
+import { parseBuffer } from 'music-metadata';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const MAX_SEC = 240;
+const EXT = ['.mp3', '.wav', '.m4a', '.mp4', '.mpeg', '.mpga', '.webm', '.ogg', '.flac'];
+const STT = process.env.STT_MODEL || 'gpt-4o-transcribe';
+const TXT = process.env.TEXT_MODEL || 'gpt-4o-mini';
+if (!process.env.OPENAI_API_KEY) console.warn('⚠️  OPENAI_API_KEY не задан (см. .env.example)');
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Файлы только в памяти — на диск ничего не пишется
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+const app = express();
+app.use(express.json({ limit: '1mb' }));
+app.get('/', (_req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+
+const fail = (res, code, msg) => res.status(code).json({ error: msg });
+
+async function chat(system, user) {
+  const r = await openai.chat.completions.create({
+    model: TXT, temperature: 0.2,
+    messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+  });
+  return r.choices[0].message.content.trim();
+}
+
+app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
+  try {
+    const f = req.file;
+    if (!f) return fail(res, 400, 'Файл не получен.');
+    const ext = path.extname(f.originalname).toLowerCase();
+    if (!EXT.includes(ext)) return fail(res, 415, `Формат ${ext || 'файла'} не поддерживается. Используйте MP3, WAV, M4A, MP4, OGG, FLAC или WEBM.`);
+    let dur;
+    try { dur = (await parseBuffer(f.buffer, { mimeType: f.mimetype })).format.duration; } catch {}
+    if (!dur) return fail(res, 422, 'Не удалось прочитать файл — возможно, он повреждён.');
+    if (dur > MAX_SEC) return fail(res, 413, `Запись длится ${Math.ceil(dur)} с. Максимум — 4 минуты.`);
+
+    const file = await toFile(f.buffer, `audio${ext}`);
+    const raw = (await openai.audio.transcriptions.create({ file, model: STT })).text?.trim() || '';
+    if (raw.replace(/[^\p{L}\p{N}]/gu, '').length < 2) return fail(res, 422, 'Речь в записи не обнаружена или качество слишком низкое.');
+
+    const text = await chat(
+      'Ты редактор расшифровок. Тебе дан текст распознанной речи. Расставь знаки препинания и заглавные буквы, раздели на абзацы по смыслу. ' +
+      'Если ясно, что говорят несколько людей, оформи реплики как «Спикер 1: …», «Спикер 2: …» с новой строки; если говорящий один — метки не добавляй. ' +
+      'СТРОГО: не меняй слова, не пропускай и не добавляй предложения, не переводи, сохрани язык оригинала. Верни только готовый текст.', raw);
+    res.json({ text, raw, duration: dur });
+  } catch (e) { console.error(e); fail(res, e.status === 401 ? 500 : 502, e.status === 401 ? 'Неверный API-ключ на сервере.' : 'Ошибка сервиса распознавания. Попробуйте ещё раз.'); }
+});
+
+app.post('/api/analyze', async (req, res) => {
+  try {
+    const { text, mode } = req.body || {};
+    if (!text || !['summary', 'tasks'].includes(mode)) return fail(res, 400, 'Неверный запрос.');
+    const sys = mode === 'summary'
+      ? 'Сделай краткое содержание текста: 3–6 предложений или короткий список ключевых мыслей. Отвечай на языке текста.'
+      : 'Выпиши из текста все задания, поручения, домашние задания и дела как маркированный список (с исполнителем и сроком, если указаны). Если их нет — ответь одной фразой, что заданий не найдено. Отвечай на языке текста.';
+    res.json({ result: await chat(sys, text) });
+  } catch (e) { console.error(e); fail(res, 502, 'Не удалось обработать текст.'); }
+});
+
+app.use((err, _req, res, _next) => err.code === 'LIMIT_FILE_SIZE' ? fail(res, 413, 'Файл слишком большой (макс. 25 МБ).') : fail(res, 500, 'Внутренняя ошибка.'));
+app.listen(process.env.PORT || 3000, () => console.log('http://localhost:' + (process.env.PORT || 3000)));
+{"name":"audio-to-text","version":"1.0.0","type":"module","scripts":{"start":"node server.js"},"engines":{"node":">=18"},
+"dependencies":{"dotenv":"^16.4.5","express":"^4.19.2","multer":"^1.4.5-lts.1","music-metadata":"^10.5.0","openai":"^4.67.0"}}
